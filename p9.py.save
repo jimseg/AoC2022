@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+
+""" forests """
+
+import re
+import sys
+
+#from collections import defaultdict
+
+# if any cli args, assume there's a fie test.txt (used ith the example inputs
+
+if len(sys.argv) == 1:
+    inname = "input%s.txt" % (re.sub(r'\D*(\d+).*', r'\1', sys.argv[0]))
+else:
+    inname = "test.txt"
+
+#   describe relationship before moving as one of 3 pairs of 2 bits
+#    T..  ...  ...  .T.   ...  ...  ..T  ...  ... 
+#    .H.  TH.  .H.  .H.   .X.  .H.  .H.  .HT  .H.
+#    ...  ...  T..  ...   ...  .T.  ...  ...  ..T
+#     0    1    2    3     4    5    6    7    8  
+# U   -    -   /U    -     -    U    -    -   \U     
+# D  \D    -    -    D     -    -    /D   -    - 
+# L   -    -    -     -     -   -    /D   L   \U
+# R  \D    R   /U    -     -    -    -    -    -
+#
+
+# map delta x and delta y to one of theabove values
+adjmap = {(-1,1):0,(-1,0):1,(-1,-1):2,(0,1):3,(0,0):4,(0,-1):5,(1,1):6,(1,0):7, (1,-1):8}
+
+# for each of up, down, left, right give updates of tail based on adjmap value
+#        -         -      up R      -        -       U        -               up L
+Uone=[( 0, 0), ( 0, 0), ( 1, 1), ( 0, 0), ( 0, 0),( 0, 1), ( 0, 0), ( 0, 0), (-1, 1)]
+#      dn R        -       -        D        -       -       dn L       -       - 
+Done=[( 1,-1), ( 0, 0), ( 0, 0), ( 0,-1), ( 0, 0),( 0, 0), (-1,-1), ( 0, 0), ( 0, 0)]
+#        -        -       -         -        -      --       dn L-      L      up L
+Lone=[( 0, 0), ( 0, 0), ( 0, 0), ( 0, 0), ( 0, 0),( 0, 0), (-1,-1), (-1, 0), (-1, 1)]
+#      dn R       R       up R      -        -       -         -       -       -
+Rone=[( 1,-1), ( 1, 0), ( 1, 1), ( 0, 0), ( 0, 0),( 0, 0), ( 0, 0), ( 0, 0), ( 0, 0)]
+
+visited = set()
+tx = ty = hx = hy = minx = maxx = miny = maxy = 0
+
+def get_adj(tx, ty, hx, hy):
+    """identiy which of the 9 possible layouts we are in"""
+    tpl = (tx - hx, ty - hy)
+    return adjmap[tpl]
+
+def do_up(n):
+    """go up n steps"""
+    global tx, ty, hx, hy, minx, maxx, miny, maxy
+    while n > 0:
+        n -= 1
+        adj = get_adj(tx, ty, hx, hy)
+        dx, dy = Uone[adj]
+        tx += dx
+        ty += dy
+        hy += 1
+        maxy = max(maxy, ty, hy)
+        maxx = max(maxx, tx, hx)
+        miny = min(miny, ty, hy)
+        minx = min(minx, tx, hx)
+        visited.add((tx, ty))
+
+heads = [(0, 0) for i in range(10)]
+tails = [(0, 0) for i in range(10)]
+               
+def one_up(tpl_t, tpl_h):
+    """go up 1 step"""
+    tx, ty = tpl_t
+    hx, hy = tpl_h
+    adj = get_adj(tx, ty, hx, hy)
+    dx, dy = Uone[adj]
+    tx += dx
+    ty += dy
+    hy += 1
+    return (tx, ty), (hx, hy)
+
+def cmd_up(n):
+    """crack the whip"""
+    while n > 0:
+        n -= 1
+        for idx in range(10):
+            new_tail, new_head = one_up(tails[idx], heads[idx])
+            tails[idx] = new_tail
+            heads[idx] = new_head
+            if idx != 9:
+                heads[idx + 1] = tails[idx]
+            else:
+                visited.add((tx, ty))
+
+def do_down(n):
+    """go down n steps"""
+    global tx, ty, hx, hy, minx, maxx, miny, maxy
+    while n > 0:
+        n -= 1
+        adj = get_adj(tx, ty, hx, hy)
+        dx, dy = Done[adj]
+        tx += dx
+        ty += dy
+        hy -= 1
+        maxy = max(maxy, ty, hy)
+        maxx = max(maxx, tx, hx)
+        miny = min(miny, ty, hy)
+        minx = min(minx, tx, hx)
+        visited.add((tx, ty))
+    
+def one_down(tpl_t, tpl_h):
+    """go down 1 step"""
+    tx, ty = tpl_t
+    hx, hy = tpl_h
+    adj = get_adj(tx, ty, hx, hy)
+    dx, dy = Done[adj]
+    tx += dx
+    ty += dy
+    hy -= 1
+    return((tx, ty), (hx, hy))
+
+def cmd_down(n):
+    """crack the whip"""
+    while n > 0:
+        n -= 1
+        for idx in range(10):
+            new_tail, new_head = one_down(tails[idx], heads[idx])
+            tails[idx] = new_tail
+            heads[idx] = new_head
+            if idx != 9:
+                heads[idx + 1] = tails[idx]
+            else:
+                visited.add((tx, ty))
+
+def do_left(n):
+    """go left n steps"""
+    global tx, ty, hx, hy, minx, maxx, miny, maxy
+    while n > 0:
+        n -= 1
+        adj = get_adj(tx, ty, hx, hy)
+        dx, dy = Lone[adj]
+        tx += dx
+        ty += dy
+        hx -= 1
+        maxy = max(maxy, ty, hy)
+        maxx = max(maxx, tx, hx)
+        miny = min(miny, ty, hy)
+        minx = min(minx, tx, hx)
+        visited.add((tx, ty))
+    
+def one_left(tpl_t, tpl_h):
+    """go left 1 step"""
+    tx, ty = tpl_t
+    hx, hy = tpl_h
+    adj = get_adj(tx, ty, hx, hy)
+    dx, dy = Lone[adj]
+    tx += dx
+    ty += dy
+    hx -= 1
+    return (tx, ty), (hx, hy)
+
+def cmd_left(n):
+    """crack the whip"""
+    while n > 0:
+        n -= 1
+        for idx in range(10):
+            new_tail, new_head = one_left(tails[idx], heads[idx])
+            tails[idx] = new_tail
+            heads[idx] = new_head
+            if idx != 9:
+                heads[idx + 1] = tails[idx]
+            else:
+                visited.add((tx, ty))
+
+def do_right(n):
+    """go right n steps"""
+    global tx, ty, hx, hy, minx, maxx, miny, maxy
+    while n > 0:
+        n -= 1
+        adj = get_adj(tx, ty, hx, hy)
+        dx, dy = Rone[adj]
+        tx += dx
+        ty += dy
+        hx += 1
+        maxy = max(maxy, ty, hy)
+        maxx = max(maxx, tx, hx)
+        miny = min(miny, ty, hy)
+        minx = min(minx, tx, hx)
+        visited.add((tx, ty))
+
+def one_right(tpl_t, tpl_h):
+    """ go right one step"""
+    tx, ty = tpl_t
+    hx, hy = tpl_h
+    adj = get_adj(tx, ty, hx, hy)
+    dx, dy = Rone[adj]
+    tx += dx
+    ty += dy
+    hx += 1
+    return (tx, ty), (hx, hy)
+
+def cmd_right(n):
+    """last one, Phew"""
+    while n > 0:
+        n -= 1
+        for idx in range(10):
+            new_tail, new_head = one_right(tails[idx], heads[idx])
+            tails[idx] = new_tail
+            heads[idx] = new_head
+            if idx != 9:
+                heads[idx + 1] = tails[idx]
+            else:
+                visited.add((tx, ty))
+
+def print_map():
+    """show working"""
+    global tx, ty, hx, hy
+    for row in range(6, -1, -1):
+        for col in range(6):
+            c = '.'
+            if row == hy and col == hx:
+                c = 'H'
+            elif row == ty and col == tx:
+                c = 'T'
+            elif (col, row) in visited:
+                c = '#'
+            print("%s" % c, end = '')
+        print()
+    print()
+
+def print_p2(l):
+    """part 2 map"""
+    for row in range(20):
+        for col in range(26):
+            c = '.'
+            if (row, col) == (11, 5):
+                c = 's'
+            elif (row, col) == heads[0]:
+                c = 'H'
+            else:
+                for n, tpl in enumerate(tails):
+                    if n == 0:
+                        continue
+                    if (row, col) == tpl:
+                        c = "%d" % n
+                        break
+            print("%s" %c, end = '')
+        print()
+    print(l, "\n")
+
+def main():
+    """ go exploring """
+    global tx, ty, hx, hy, minx, maxx, miny, maxy
+    for l in open(inname, 'r').readlines():
+        cmd, count = l.strip().split()
+        count = int(count)
+        if cmd == 'U':
+            do_up(count)
+        elif cmd == 'L':
+            do_left(count)
+        elif cmd == 'D':
+            do_down(count)
+        elif cmd == 'R':
+            do_right(count)
+        else:
+            print("WTF?", l)
+            sys.exit(1)
+        print("\n",l)
+    if len(sys.argv) > 1:
+        print_map()
+    print("X: %d..%d Y: %d..%d, End: H(%d, %d) T(%d, %d) visited: %d" % \
+        (minx, maxx, miny, maxy, hx, hy, tx, ty, len(visited)))
+
+    fname = inname
+    if len(sys.argv) > 1:
+        fname = "test9.txt"
+    visited.clear()
+    for i in range(10):
+        heads[i] = (11, 5)
+        tails[i] = (11, 5)
+    print_p2("initial")
+    for l in open(fname, 'r').readlines():
+        cmd, count = l.strip().split()
+        count = int(count)
+        if cmd == 'U':
+            cmd_up(count)
+        elif cmd == 'L':
+            cmd_left(count)
+        elif cmd == 'D':
+            cmd_down(count)
+        elif cmd == 'R':
+            cmd_right(count)
+        else:
+            print("WTF?", l)
+            sys.exit(1)
+        print("\n",l)
+        if len(sys.argv) > 1:
+            print_p2(l)
+    print("Part 2:", len(visited))
+        
+        
+main()        
